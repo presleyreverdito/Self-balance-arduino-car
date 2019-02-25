@@ -1,6 +1,11 @@
 #include "SparkFunMPU9250-DMP.h"
 #include "I2Cdev.h"
 #include "Kalman.h"
+enum re_command {
+  forward = 1,
+  backward = 2,
+  stay = 0};
+
 /*======================Global variable======================*/
 
 // Debug mode
@@ -24,18 +29,18 @@ double kalAngleX, kalAngleY; // Angle after Kalman filter
 double corrected_x, corrected_y; // Corrected with offset
 
 // Motor
-int dir1_L_PIN = 2;
-int dir2_L_PIN = 3;
+int dir1_L_PIN = 3;
+int dir2_L_PIN = 2;
 int speed_L_PIN = 9;
-int dir1_R_PIN = 4;
-int dir2_R_PIN = 5;
+int dir1_R_PIN = 5;
+int dir2_R_PIN = 4;
 int speed_R_PIN = 10;
 float MIN_SPEED = 25;
 float MAX_SPEED = 50;
 
 // PID
-float kp = 22;// 10.1 18
-float ki = 0.4;// 0.3
+float kp = 22;// 10.1 18 -> PV 22 10
+float ki = 0.3;// 0.3
 float kd = 20;// 9.3 16
 float kp_error = 0.0;
 float ki_error = 0.0;
@@ -49,11 +54,12 @@ float final_result = 0;
 // Special angle
 float overshoot_angle = 30;
 float PID_angle = 8;
-float reference_angle = 0.0;
+float reference_angle = 0.5;
 
 // Joystick
 int joy_x = A0;
-enum re_command {forward = 1, backward = 2, stay = 0};
+
+
 float throttle = 50;
 
 // Timer
@@ -99,11 +105,12 @@ re_command check_receiver()
 }
 
 float pid_control() { // ONLY PD RIGHT NOW
-  kp_error = kalAngleY - reference_angle;
+  //kp_error = kalAngleY - reference_angle;
+  kp_error = pitch - reference_angle;
 
   // If the car is about to fall down, adjust it quickly
-  if (kp_error >= overshoot_angle && kp_error <= -overshoot_angle) {kp = 40;}
-  else {kp = 22;}
+  //if (kp_error >= overshoot_angle && kp_error <= -overshoot_angle) {kp = 40;}
+  //else {kp = 22;}
 
   ki_error += kp_error * dif_time;
   kd_error = (kp_error - kp_pass_error) / dif_time;
@@ -189,7 +196,7 @@ void loop() {
   {
     imu_9250.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS);
     UpdateIMUData();
-    kalman();
+    //kalman();
   }
 
   // PID
@@ -200,7 +207,7 @@ void loop() {
   else {control_signal = constrain(control_signal, -MAX_SPEED, -MIN_SPEED);}
 
   // Check the receive message
-  re_command command = check_receiver();
+  re_command command = stay;
   if (command == forward) {control_signal = throttle;}
   else if (command == backward) {control_signal = -throttle;}
   
@@ -226,4 +233,3 @@ void loop() {
   // print out the debug thing
   if (PID_debug_mode) printIMUData(control_signal);
 }
-
